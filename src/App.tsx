@@ -1,136 +1,176 @@
-import { useState, useEffect } from 'react';
-import { supabase, type Product, type Article, type SubscriptionPlan } from './lib/supabase';
-import { getCurrentUser, getProfile, signOut, type Profile } from './lib/auth';
-import { ShoppingCart, User, LogIn, Menu, X, ChevronDown, Package, BookOpen, CreditCard, Users, TrendingUp } from 'lucide-react';
-import AuthModal from './components/AuthModal';
+import { useState } from 'react';
+import { ShoppingCart, Menu, X, ChevronDown, Package, BookOpen, CreditCard, Users, TrendingUp } from 'lucide-react';
 import CartSidebar from './components/CartSidebar';
-import UserDashboard from './components/UserDashboard';
 
-type View = 'home' | 'dashboard';
+type Product = {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  image_url: string;
+};
+
+type Article = {
+  id: string;
+  title: string;
+  excerpt: string;
+  content_type: 'free' | 'premium' | 'sponsored';
+  published_at: string;
+};
+
+type SubscriptionPlan = {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  billing_interval: 'monthly' | 'yearly';
+  features: string[];
+};
+
+type CartItem = {
+  id: string;
+  product: Product;
+  quantity: number;
+};
+
+const mockProducts: Product[] = [
+  {
+    id: '1',
+    name: 'Complete Business Toolkit',
+    description: 'Everything you need to start and grow your online business',
+    price: 99,
+    category: 'Digital Product',
+    image_url: 'https://images.pexels.com/photos/3184292/pexels-photo-3184292.jpeg?auto=compress&cs=tinysrgb&w=800',
+  },
+  {
+    id: '2',
+    name: 'Marketing Masterclass',
+    description: 'Learn proven strategies to market your products effectively',
+    price: 149,
+    category: 'Course',
+    image_url: 'https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=800',
+  },
+  {
+    id: '3',
+    name: '1-on-1 Consulting',
+    description: 'Personalized guidance to accelerate your growth',
+    price: 299,
+    category: 'Service',
+    image_url: 'https://images.pexels.com/photos/3184360/pexels-photo-3184360.jpeg?auto=compress&cs=tinysrgb&w=800',
+  },
+];
+
+const mockArticles: Article[] = [
+  {
+    id: '1',
+    title: '10 Ways to Monetize Your Skills Online',
+    excerpt: 'Discover proven methods to turn your expertise into income streams that work for you 24/7.',
+    content_type: 'free',
+    published_at: '2025-01-15T10:00:00Z',
+  },
+  {
+    id: '2',
+    title: 'Building a Sustainable Subscription Business',
+    excerpt: 'Learn the secrets to creating recurring revenue and building long-term customer relationships.',
+    content_type: 'premium',
+    published_at: '2025-01-10T10:00:00Z',
+  },
+  {
+    id: '3',
+    title: 'The Complete Guide to Affiliate Marketing',
+    excerpt: 'Everything you need to know about earning commissions by promoting products you love.',
+    content_type: 'free',
+    published_at: '2025-01-05T10:00:00Z',
+  },
+];
+
+const mockPlans: SubscriptionPlan[] = [
+  {
+    id: '1',
+    name: 'Starter',
+    description: 'Perfect for individuals just getting started',
+    price: 9,
+    billing_interval: 'monthly',
+    features: [
+      'Access to free content',
+      'Community forum access',
+      'Monthly newsletter',
+      'Basic support',
+    ],
+  },
+  {
+    id: '2',
+    name: 'Professional',
+    description: 'For serious creators ready to scale',
+    price: 29,
+    billing_interval: 'monthly',
+    features: [
+      'All Starter features',
+      'Access to premium content',
+      'Exclusive webinars',
+      'Priority support',
+      'Affiliate program access',
+      'Advanced analytics',
+    ],
+  },
+  {
+    id: '3',
+    name: 'Enterprise',
+    description: 'Maximum features for power users',
+    price: 99,
+    billing_interval: 'monthly',
+    features: [
+      'All Professional features',
+      '1-on-1 consulting sessions',
+      'Custom integration support',
+      'White-label options',
+      'Dedicated account manager',
+    ],
+  },
+];
 
 function App() {
-  const [view, setView] = useState<View>('home');
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
-  const [cartItems, setCartItems] = useState<any[]>([]);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [products] = useState<Product[]>(mockProducts);
+  const [articles] = useState<Article[]>(mockArticles);
+  const [plans] = useState<SubscriptionPlan[]>(mockPlans);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
 
-  useEffect(() => {
-    checkUser();
-    fetchProducts();
-    fetchArticles();
-    fetchPlans();
+  function addToCart(productId: string) {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((async (_event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        const userProfile = await getProfile(session.user.id);
-        setProfile(userProfile);
-        fetchCartItems(session.user.id);
-      } else {
-        setUser(null);
-        setProfile(null);
-        setCartItems([]);
+    setCartItems(prev => {
+      const existing = prev.find(item => item.product.id === productId);
+      if (existing) {
+        return prev.map(item =>
+          item.product.id === productId
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
       }
-    }));
+      return [...prev, { id: Date.now().toString(), product, quantity: 1 }];
+    });
+  }
 
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
-
-  async function checkUser() {
-    const currentUser = await getCurrentUser();
-    if (currentUser) {
-      setUser(currentUser);
-      const userProfile = await getProfile(currentUser.id);
-      setProfile(userProfile);
-      fetchCartItems(currentUser.id);
+  function updateCartQuantity(itemId: string, quantity: number) {
+    if (quantity <= 0) {
+      setCartItems(prev => prev.filter(item => item.id !== itemId));
+    } else {
+      setCartItems(prev =>
+        prev.map(item => (item.id === itemId ? { ...item, quantity } : item))
+      );
     }
   }
 
-  async function fetchProducts() {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('is_active', true);
-
-    if (!error && data) {
-      setProducts(data);
-    }
+  function removeFromCart(itemId: string) {
+    setCartItems(prev => prev.filter(item => item.id !== itemId));
   }
 
-  async function fetchArticles() {
-    const { data, error } = await supabase
-      .from('articles')
-      .select('*')
-      .order('published_at', { ascending: false });
-
-    if (!error && data) {
-      setArticles(data);
-    }
-  }
-
-  async function fetchPlans() {
-    const { data, error } = await supabase
-      .from('subscription_plans')
-      .select('*')
-      .eq('is_active', true);
-
-    if (!error && data) {
-      setPlans(data);
-    }
-  }
-
-  async function fetchCartItems(userId: string) {
-    const { data, error } = await supabase
-      .from('cart_items')
-      .select(`
-        *,
-        products (*)
-      `)
-      .eq('user_id', userId);
-
-    if (!error && data) {
-      setCartItems(data);
-    }
-  }
-
-  async function addToCart(productId: string) {
-    if (!user) {
-      setAuthMode('login');
-      setShowAuthModal(true);
-      return;
-    }
-
-    const { error } = await supabase
-      .from('cart_items')
-      .upsert([
-        {
-          user_id: user.id,
-          product_id: productId,
-          quantity: 1,
-        },
-      ]);
-
-    if (!error) {
-      fetchCartItems(user.id);
-    }
-  }
-
-  async function handleSignOut() {
-    await signOut();
-    setView('home');
-  }
-
-  const cartItemCount = cartItems.length;
+  const cartItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   const faqs = [
     {
@@ -150,17 +190,6 @@ function App() {
       answer: 'Yes, we offer a 30-day money-back guarantee on all products and a pro-rated refund on subscriptions if you cancel within the first week.',
     },
   ];
-
-  if (view === 'dashboard' && user) {
-    return (
-      <UserDashboard
-        user={user}
-        profile={profile}
-        onBack={() => setView('home')}
-        onSignOut={handleSignOut}
-      />
-    );
-  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -182,39 +211,17 @@ function App() {
             </nav>
 
             <div className="flex items-center space-x-4">
-              {user ? (
-                <>
-                  <button
-                    onClick={() => setShowCart(true)}
-                    className="relative p-2 text-slate-700 hover:text-emerald-600 transition"
-                  >
-                    <ShoppingCart className="h-6 w-6" />
-                    {cartItemCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-emerald-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        {cartItemCount}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => setView('dashboard')}
-                    className="flex items-center space-x-2 px-4 py-2 text-slate-700 hover:text-emerald-600 transition"
-                  >
-                    <User className="h-5 w-5" />
-                    <span className="hidden sm:inline">Dashboard</span>
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => {
-                    setAuthMode('login');
-                    setShowAuthModal(true);
-                  }}
-                  className="flex items-center space-x-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition"
-                >
-                  <LogIn className="h-5 w-5" />
-                  <span>Log In</span>
-                </button>
-              )}
+              <button
+                onClick={() => setShowCart(true)}
+                className="relative p-2 text-slate-700 hover:text-emerald-600 transition"
+              >
+                <ShoppingCart className="h-6 w-6" />
+                {cartItemCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-emerald-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {cartItemCount}
+                  </span>
+                )}
+              </button>
 
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -247,22 +254,12 @@ function App() {
                 The all-in-one platform for creators and entrepreneurs to monetize their expertise through products, content, and subscriptions.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                {!user && (
-                  <>
-                    <button
-                      onClick={() => {
-                        setAuthMode('signup');
-                        setShowAuthModal(true);
-                      }}
-                      className="px-8 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-lg font-semibold"
-                    >
-                      Get Started Free
-                    </button>
-                    <button className="px-8 py-3 bg-white text-emerald-600 rounded-lg hover:bg-slate-50 transition text-lg font-semibold border-2 border-emerald-600">
-                      View Demo
-                    </button>
-                  </>
-                )}
+                <button className="px-8 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-lg font-semibold">
+                  Get Started Free
+                </button>
+                <button className="px-8 py-3 bg-white text-emerald-600 rounded-lg hover:bg-slate-50 transition text-lg font-semibold border-2 border-emerald-600">
+                  View Demo
+                </button>
               </div>
             </div>
           </div>
@@ -446,17 +443,7 @@ function App() {
               </div>
             </div>
             <div className="text-center mt-12">
-              <button
-                onClick={() => {
-                  if (!user) {
-                    setAuthMode('signup');
-                    setShowAuthModal(true);
-                  } else {
-                    setView('dashboard');
-                  }
-                }}
-                className="px-8 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-lg font-semibold"
-              >
+              <button className="px-8 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-lg font-semibold">
                 Become an Affiliate
               </button>
             </div>
@@ -533,22 +520,12 @@ function App() {
         </div>
       </footer>
 
-      {showAuthModal && (
-        <AuthModal
-          mode={authMode}
-          onClose={() => setShowAuthModal(false)}
-          onSuccess={() => {
-            setShowAuthModal(false);
-            checkUser();
-          }}
-        />
-      )}
-
-      {showCart && user && (
+      {showCart && (
         <CartSidebar
           items={cartItems}
           onClose={() => setShowCart(false)}
-          onUpdateCart={() => fetchCartItems(user.id)}
+          onUpdateQuantity={updateCartQuantity}
+          onRemove={removeFromCart}
         />
       )}
     </div>

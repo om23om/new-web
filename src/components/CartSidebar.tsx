@@ -1,30 +1,27 @@
-import { X, Trash2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { X, Trash2, Plus, Minus } from 'lucide-react';
+
+type Product = {
+  id: string;
+  name: string;
+  price: number;
+  image_url: string;
+};
 
 type CartItem = {
   id: string;
+  product: Product;
   quantity: number;
-  products: {
-    id: string;
-    name: string;
-    price: number;
-    image_url: string;
-  };
 };
 
 type CartSidebarProps = {
   items: CartItem[];
   onClose: () => void;
-  onUpdateCart: () => void;
+  onUpdateQuantity: (itemId: string, quantity: number) => void;
+  onRemove: (itemId: string) => void;
 };
 
-export default function CartSidebar({ items, onClose, onUpdateCart }: CartSidebarProps) {
-  async function removeItem(itemId: string) {
-    await supabase.from('cart_items').delete().eq('id', itemId);
-    onUpdateCart();
-  }
-
-  const total = items.reduce((sum, item) => sum + item.products.price * item.quantity, 0);
+export default function CartSidebar({ items, onClose, onUpdateQuantity, onRemove }: CartSidebarProps) {
+  const total = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -54,20 +51,36 @@ export default function CartSidebar({ items, onClose, onUpdateCart }: CartSideba
                   className="flex gap-4 p-4 bg-slate-50 rounded-lg"
                 >
                   <img
-                    src={item.products.image_url}
-                    alt={item.products.name}
+                    src={item.product.image_url}
+                    alt={item.product.name}
                     className="w-20 h-20 object-cover rounded"
                   />
                   <div className="flex-1">
-                    <h3 className="font-semibold text-slate-900">{item.products.name}</h3>
+                    <h3 className="font-semibold text-slate-900">{item.product.name}</h3>
                     <p className="text-emerald-600 font-bold mt-1">
-                      ${item.products.price}
+                      ${item.product.price}
                     </p>
-                    <p className="text-sm text-slate-500">Quantity: {item.quantity}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <button
+                        onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
+                        className="p-1 text-slate-600 hover:bg-slate-200 rounded transition"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </button>
+                      <span className="text-sm text-slate-700 font-medium min-w-[2rem] text-center">
+                        {item.quantity}
+                      </span>
+                      <button
+                        onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+                        className="p-1 text-slate-600 hover:bg-slate-200 rounded transition"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                   <button
-                    onClick={() => removeItem(item.id)}
-                    className="p-2 text-red-500 hover:bg-red-50 rounded transition"
+                    onClick={() => onRemove(item.id)}
+                    className="p-2 text-red-500 hover:bg-red-50 rounded transition self-start"
                   >
                     <Trash2 className="h-5 w-5" />
                   </button>
